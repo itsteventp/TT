@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TikTok Live Event Tracker & Gift Queue Dashboard</title>
+    <!-- SEO Meta Tags -->
+    <meta name="description" content="A real-time TikTok Live stream event tracker and interactive gift queue dashboard built with Node.js, Express, Socket.io, and Tailwind CSS.">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Plus Jakarta Sans', 'sans-serif'],
+                        display: ['Outfit', 'sans-serif'],
+                    },
+                    colors: {
+                        dark: {
+                            950: '#09090b',
+                            900: '#121214',
+                            800: '#1a1a1e',
+                            700: '#252529',
+                            600: '#3f3f46',
+                        },
+                        accent: {
+                            purple: '#9333ea',
+                            pink: '#ec4899',
+                            emerald: '#10b981',
+                            rose: '#f43f5e',
+                            amber: '#f59e0b',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Custom Scrollbar & Animation Styles -->
+    <style>
+        /* Custom Scrollbar Styles */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(18, 18, 20, 0.5);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(147, 51, 234, 0.3);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(147, 51, 234, 0.6);
+        }
+        
+        /* Floating Background Animation */
+        @keyframes float {
+            0% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-10px) rotate(2deg); }
+            100% { transform: translateY(0px) rotate(0deg); }
+        }
+        .float-animate {
+            animation: float 6s ease-in-out infinite;
+        }
+
+        /* Subtle pulse for online status */
+        @keyframes pulse-ring {
+            0% { transform: scale(0.95); opacity: 0.5; }
+            50% { transform: scale(1.15); opacity: 0.8; }
+            100% { transform: scale(0.95); opacity: 0.5; }
+        }
+        .pulse-light {
+            animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        /* Message scroll smooth behaviour */
+        .chat-container {
+            scroll-behavior: smooth;
+        }
+    </style>
+</head>
+<body class="bg-dark-950 text-zinc-100 font-sans min-h-screen flex flex-col antialiased selection:bg-purple-500/30 selection:text-purple-200">
+
+    <!-- Top Glow Accent -->
+    <div class="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-[120px] bg-gradient-to-r from-purple-600/10 via-pink-600/10 to-rose-600/10 blur-3xl pointer-events-none rounded-full"></div>
+
+    <!-- Header Section -->
+    <header class="relative border-b border-dark-800 bg-dark-900/60 backdrop-blur-md sticky top-0 z-50 px-4 py-4 sm:px-6">
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-4 relative">
+            
+            <!-- Branding & Title -->
+            <div class="flex items-center gap-3 pr-28 md:pr-0">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 to-pink-600 flex items-center justify-center shadow-lg shadow-purple-900/20">
+                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-xl sm:text-2xl font-bold font-display bg-gradient-to-r from-purple-400 via-pink-400 to-rose-400 bg-clip-text text-transparent leading-none">
+                        TikTok Live Tracker
+                    </h1>
+                    <p id="brandingSubtitle" class="text-xs text-zinc-500 font-medium tracking-wide mt-1">created by Steven</p>
+                </div>
+            </div>
+
+            <!-- Controller / Connection Inputs -->
+            <div class="flex items-center gap-3 w-full md:w-auto md:justify-end">
+                <!-- Status Display -->
+                <div class="absolute top-[4px] right-0 md:relative md:top-auto md:right-auto flex items-center gap-2 px-3 py-1.5 rounded-lg bg-dark-800 border border-dark-700/60 transition-all">
+                    <div id="statusIndicator" class="w-2.5 h-2.5 rounded-full bg-zinc-500 transition-colors duration-300"></div>
+                    <span id="statusText" class="text-xs font-semibold text-zinc-400 tracking-wide uppercase">Status: Offline</span>
+                </div>
+
+                <!-- Input Streamer Username -->
+                <div class="relative flex items-center flex-grow md:flex-none">
+                    <span class="absolute left-3 text-zinc-500 font-bold text-sm">@</span>
+                    <input 
+                        type="text" 
+                        id="usernameInput" 
+                        placeholder="username" 
+                        class="bg-dark-800 text-zinc-100 placeholder-zinc-500 border border-dark-700 rounded-lg pl-8 pr-3 py-2 text-sm focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/50 w-full md:w-52 transition-all"
+                        autocomplete="off"
+                        spellcheck="false"
+                    >
+                </div>
+
+                <!-- Start/Stop Connection Toggle -->
+                <button 
+                    id="connectBtn" 
+                    class="bg-accent-emerald hover:bg-emerald-600 active:scale-95 text-white font-bold px-5 py-2 rounded-lg text-sm transition-all shadow-md shadow-emerald-950/20 shrink-0"
+                >
+                    Start Connection
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container Layout -->
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 py-6 sm:px-6 flex flex-col gap-6 relative z-10">
+        
+        <!-- Interactive Feed & Upcoming List -->
+        <section class="w-full flex flex-col gap-5">
+            
+            <!-- Headline Title for Feed -->
+            <div class="flex items-center justify-between border-b border-dark-800 pb-3">
+                <h2 class="text-lg font-bold font-display text-zinc-200 tracking-wide flex items-center gap-2">
+                    Gift queue feed
+                    <span id="pulsingLiveDot" class="w-2.5 h-2.5 rounded-full bg-accent-emerald pulse-light hidden"></span>
+                </h2>
+                
+                <!-- Merged Controls Row (Active Count & Clear Button) -->
+                <div class="flex items-center gap-3">
+                    <span id="sortLabel" class="hidden sm:inline text-xs text-zinc-500 font-medium">Sorted chronologically (oldest top)</span>
+                    <span id="queueCounter" class="bg-dark-800 border border-dark-700 px-2.5 py-1 rounded-lg text-xs font-bold text-zinc-300">0 Items</span>
+                    <button 
+                        id="clearQueueBtn" 
+                        class="bg-dark-800 hover:bg-dark-700 active:scale-95 text-zinc-300 hover:text-zinc-100 font-semibold px-3 py-1.5 rounded-lg text-xs transition-all border border-dark-700/60 flex items-center gap-1.5"
+                        title="Clear all queue items"
+                    >
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                        Clear Queue
+                    </button>
+                </div>
+            </div>
+
+            <!-- Feed Area -->
+            <div id="queueFeedContainer" class="flex flex-col gap-4 flex-grow overflow-y-auto max-h-[72vh] pr-2">
+                <!-- Empty state fallback layout -->
+                <div id="emptyState" class="flex flex-col items-center justify-center text-center py-16 px-4 bg-dark-900/20 border border-dashed border-dark-800 rounded-2xl h-full min-h-[360px] select-none">
+                    <div class="w-16 h-16 rounded-full bg-purple-950/20 border border-purple-800/30 flex items-center justify-center text-3xl mb-4 float-animate text-purple-400">
+                        🎁
+                    </div>
+                    <h3 class="text-base font-semibold text-zinc-300 font-display">No Live Interactions Yet</h3>
+                    <p class="text-xs text-zinc-500 max-w-xs mt-1.5 leading-relaxed">
+                        Connect to a TikTok stream above, or use the <strong>mock</strong> option to generate simulated interactions in real time.
+                    </p>
+                </div>
+
+                <!-- Feed items will inject here dynamically -->
+                <div id="activeQueueContainer" class="flex flex-col gap-4 hidden">
+                    <!-- Top Expanded Container Slot -->
+                    <div id="topSlot"></div>
+                    
+                    <!-- Upcoming Queue Divider -->
+                    <div id="upcomingDivider" class="flex items-center gap-3 my-1">
+                        <span class="text-[10px] uppercase tracking-wider font-extrabold text-zinc-600 shrink-0">Upcoming Queue</span>
+                        <div class="h-[1px] w-full bg-dark-800/60"></div>
+                    </div>
+
+                    <!-- Compact rows container -->
+                    <div id="upcomingSlots" class="flex flex-col gap-3"></div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="mt-auto border-t border-dark-800/40 bg-dark-950/20 px-4 py-6">
+        <div class="max-w-7xl mx-auto flex items-center justify-center gap-3 text-xs font-semibold">
+            <button 
+                id="btnLangEn" 
+                class="transition-colors focus:outline-none"
+            >
+                English
+            </button>
+            <span class="text-zinc-700 font-normal select-none pointer-events-none">|</span>
+            <button 
+                id="btnLangEs" 
+                class="transition-colors focus:outline-none"
+            >
+                Español
+            </button>
+        </div>
+    </footer>
+
+    <!-- Socket.io Client Library -->
+    <script src="/socket.io/socket.io.js"></script>
+    
+    <!-- Script Operations Logic -->
+    <script>
+        const socket = io();
+        let queue = [];
+        let connectionStatus = 'offline';
+        let activeUsername = '';
+        let currentLang = 'en';
+
+        const translations = {
+            en: {
+                statusOffline: "Status: Offline",
+                statusConnecting: "Status: Connecting...",
+                statusConnected: "Status: Live Tracking",
+                statusError: "Status: Error",
+                placeholderUsername: "username",
+                btnStart: "Start Connection",
+                btnStop: "Stop Connection",
+                btnConnecting: "Connecting...",
+                feedTitle: "Gift queue feed",
+                sortLabel: "Sorted chronologically (oldest top)",
+                clearBtn: "Clear Queue",
+                emptyTitle: "No Live Interactions Yet",
+                emptyText: "Connect to a TikTok stream above, or use the <strong>mock</strong> option to generate simulated interactions in real time.",
+                waitingMessages: "Waiting for messages...",
+                swipeDismiss: "Swipe Left to Dismiss",
+                giftSent: "Gift Sent",
+                chatLogs: "Live Chat Logs",
+                upcomingQueue: "Upcoming Queue",
+                dismissTooltip: "Dismiss Container",
+                alertEmptyUsername: "Please enter a valid TikTok username to connect.",
+                confirmClearQueue: "Are you sure you want to clear all queue logs?",
+                itemLabel: "Item",
+                itemsLabel: "Items",
+                brandingSubtitle: "created by Steven"
+            },
+            es: {
+                statusOffline: "Estado: Desconectado",
+                statusConnecting: "Estado: Conectando...",
+                statusConnected: "Estado: Monitoreando en Vivo",
+                statusError: "Estado: Error",
+                placeholderUsername: "usuario",
+                btnStart: "Iniciar Conexión",
+                btnStop: "Detener Conexión",
+                btnConnecting: "Conectando...",
+                feedTitle: "Cola de Regalos",
+                sortLabel: "Ordenado cronológicamente (más antiguo arriba)",
+                clearBtn: "Limpiar Cola",
+                emptyTitle: "Aún no hay interacciones en vivo",
+                emptyText: "Conéctate a una transmisión de TikTok arriba, o usa la opción <strong>mock</strong> para generar interacciones simuladas en tiempo real.",
+                waitingMessages: "Esperando mensajes...",
+                swipeDismiss: "Desliza a la izquierda para descartar",
+                giftSent: "Regalo Enviado",
+                chatLogs: "Registro de Chat en Vivo",
+                upcomingQueue: "Próximos en Cola",
+                dismissTooltip: "Descartar Contenedor",
+                alertEmptyUsername: "Por favor, introduce un usuario de TikTok válido para conectar.",
+                confirmClearQueue: "¿Estás seguro de que deseas limpiar todo el registro de la cola?",
+                itemLabel: "Elemento",
+                itemsLabel: "Elementos",
+                brandingSubtitle: "creado por Steven"
+            }
+        };
+
+        function updateLanguage(lang) {
+            currentLang = lang;
+            
+            // Update active/inactive language button styles in the footer
+            const btnEn = document.getElementById('btnLangEn');
+            const btnEs = document.getElementById('btnLangEs');
+            if (btnEn && btnEs) {
+                if (currentLang === 'en') {
+                    btnEn.className = 'text-purple-400 font-bold cursor-default pointer-events-none focus:outline-none';
+                    btnEs.className = 'text-zinc-500 hover:text-zinc-300 cursor-pointer transition-colors focus:outline-none';
+                } else {
+                    btnEn.className = 'text-zinc-500 hover:text-zinc-300 cursor-pointer transition-colors focus:outline-none';
+                    btnEs.className = 'text-purple-400 font-bold cursor-default pointer-events-none focus:outline-none';
+                }
+            }
+
+            // Update username placeholder
+            usernameInput.placeholder = translations[currentLang].placeholderUsername;
+            
+            // Update connect button text based on state
+            if (connectionStatus === 'connected') {
+                connectBtn.textContent = translations[currentLang].btnStop;
+            } else if (connectionStatus === 'connecting') {
+                connectBtn.textContent = translations[currentLang].btnConnecting;
+            } else {
+                connectBtn.textContent = translations[currentLang].btnStart;
+            }
+            
+            // Update status text
+            if (connectionStatus === 'connected') {
+                statusText.textContent = `${translations[currentLang].statusConnected} (${activeUsername})`;
+            } else if (connectionStatus === 'connecting') {
+                statusText.textContent = `${translations[currentLang].statusConnecting} (${activeUsername})...`;
+            } else if (connectionStatus === 'error') {
+                // Keep error
+            } else {
+                statusText.textContent = translations[currentLang].statusOffline;
+            }
+            
+            // Update branding subtitle
+            const brandingSub = document.getElementById('brandingSubtitle');
+            if (brandingSub) {
+                brandingSub.textContent = translations[currentLang].brandingSubtitle;
+            }
+
+            // Update feed headers and buttons
+            document.querySelector('#clearQueueBtn').innerHTML = `
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                ${translations[currentLang].clearBtn}
+            `;
+            
+            const h2 = document.querySelector('h2.text-lg.font-bold.font-display');
+            if (h2 && h2.childNodes[0]) {
+                h2.childNodes[0].textContent = translations[currentLang].feedTitle + ' ';
+            }
+            const sortSpan = document.getElementById('sortLabel');
+            if (sortSpan) {
+                sortSpan.textContent = translations[currentLang].sortLabel;
+            }
+            
+            // Update empty state text
+            const emptyH3 = document.querySelector('#emptyState h3');
+            if (emptyH3) emptyH3.textContent = translations[currentLang].emptyTitle;
+            const emptyP = document.querySelector('#emptyState p');
+            if (emptyP) emptyP.innerHTML = translations[currentLang].emptyText;
+            
+            renderQueue();
+        }
+
+        // DOM elements
+        const usernameInput = document.getElementById('usernameInput');
+        const connectBtn = document.getElementById('connectBtn');
+        const statusIndicator = document.getElementById('statusIndicator');
+        const statusText = document.getElementById('statusText');
+        const queueCounter = document.getElementById('queueCounter');
+        const clearQueueBtn = document.getElementById('clearQueueBtn');
+        const emptyState = document.getElementById('emptyState');
+        const activeQueueContainer = document.getElementById('activeQueueContainer');
+        const topSlot = document.getElementById('topSlot');
+        const upcomingSlots = document.getElementById('upcomingSlots');
+        const upcomingDivider = document.getElementById('upcomingDivider');
+        const pulsingLiveDot = document.getElementById('pulsingLiveDot');
+
+        // Initial setup on load
+        document.addEventListener('DOMContentLoaded', () => {
+            const btnEn = document.getElementById('btnLangEn');
+            const btnEs = document.getElementById('btnLangEs');
+            if (btnEn) {
+                btnEn.addEventListener('click', () => updateLanguage('en'));
+            }
+            if (btnEs) {
+                btnEs.addEventListener('click', () => updateLanguage('es'));
+            }
+            updateLanguage(currentLang);
+        });
+
+        // ----------------------------------------------------
+        // UTILITIES
+        // ----------------------------------------------------
+        function getFallbackColor(nickname) {
+            const colors = [
+                'from-purple-600 to-indigo-700',
+                'from-pink-500 to-rose-600',
+                'from-blue-500 to-indigo-600',
+                'from-teal-500 to-emerald-600',
+                'from-amber-500 to-orange-600',
+                'from-fuchsia-600 to-pink-700'
+            ];
+            let hash = 0;
+            if (nickname) {
+                for (let i = 0; i < nickname.length; i++) {
+                    hash = nickname.charCodeAt(i) + ((hash << 5) - hash);
+                }
+            }
+            const index = Math.abs(hash) % colors.length;
+            return colors[index];
+        }
+
+        function getAvatarHTML(nickname, profilePic) {
+            const fallbackColor = getFallbackColor(nickname);
+            const initial = nickname ? nickname.charAt(0).toUpperCase() : '?';
+            
+            return `
+                <div class="relative w-full h-full rounded-full overflow-hidden border border-purple-500/20 flex items-center justify-center bg-gradient-to-br ${fallbackColor} shadow-inner shrink-0">
+                    ${profilePic ? `<img src="${profilePic}" alt="${nickname}" class="w-full h-full object-cover select-none pointer-events-none" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'">` : ''}
+                    <span class="${profilePic ? 'hidden' : 'flex'} w-full h-full items-center justify-center text-zinc-100 font-extrabold uppercase font-sans text-sm pointer-events-none select-none">${initial}</span>
+                </div>
+            `;
+        }
+
+        function getGiftIconHTML(giftName, giftIcon) {
+            const fallback = `
+                <div class="w-9 h-9 rounded-lg bg-purple-500/20 text-purple-400 flex items-center justify-center border border-purple-500/30 text-base shadow-sm shrink-0 select-none">
+                    🎁
+                </div>
+            `;
+            if (!giftIcon) return fallback;
+            return `
+                <div class="relative w-9 h-9 shrink-0 select-none">
+                    <img src="${giftIcon}" alt="${giftName}" class="w-full h-full object-contain filter drop-shadow-[0_2px_4px_rgba(147,51,234,0.4)] select-none pointer-events-none" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'">
+                    <div class="hidden w-full h-full bg-purple-500/20 text-purple-400 rounded-lg items-center justify-center border border-purple-500/30 text-base shadow-sm">🎁</div>
+                </div>
+            `;
+        }
+
+        // ----------------------------------------------------
+        // RENDER LOGIC
+        // ----------------------------------------------------
+        function renderQueue() {
+            // Filter only uncompleted
+            const activeItems = queue.filter(item => !item.done);
+            
+            const countLabel = activeItems.length === 1 ? translations[currentLang].itemLabel : translations[currentLang].itemsLabel;
+            queueCounter.textContent = `${activeItems.length} ${countLabel}`;
+
+            if (activeItems.length === 0) {
+                emptyState.classList.remove('hidden');
+                activeQueueContainer.classList.add('hidden');
+                return;
+            }
+
+            emptyState.classList.add('hidden');
+            activeQueueContainer.classList.remove('hidden');
+
+            // Render Top Container (Index 0)
+            const topItem = activeItems[0];
+            renderTopContainer(topItem);
+
+            // Render Upcoming (Index 1+)
+            const upcomingItems = activeItems.slice(1);
+            if (upcomingItems.length === 0) {
+                upcomingDivider.classList.add('hidden');
+                upcomingSlots.innerHTML = '';
+            } else {
+                upcomingDivider.classList.remove('hidden');
+                upcomingDivider.querySelector('span').textContent = translations[currentLang].upcomingQueue;
+                upcomingSlots.innerHTML = upcomingItems.map(item => createCollapsedRow(item)).join('');
+            }
+        }
+
+        function renderTopContainer(item) {
+            const messageListHTML = item.messages.length === 0 
+                ? `<div class="text-zinc-500 text-[11px] font-medium py-3 text-center bg-black/20 rounded-lg italic">${translations[currentLang].waitingMessages}</div>`
+                : item.messages.map(msg => `
+                    <div class="text-[12px] leading-relaxed px-2 py-1 rounded bg-dark-950/45 border-l-2 border-purple-500/40">
+                        <span class="font-bold text-purple-300 font-display">${item.nickname}</span>
+                        <span class="text-zinc-300 ml-1">${escapeHTML(msg)}</span>
+                    </div>
+                `).join('');
+
+            topSlot.innerHTML = `
+                <div 
+                    id="topCard-${item.id}"
+                    data-id="${item.id}"
+                    class="relative border border-purple-500/30 rounded-2xl bg-gradient-to-br from-dark-900/90 to-dark-800/80 backdrop-blur-md shadow-xl overflow-hidden touch-none select-none p-5 sm:p-6 transition-all duration-300"
+                >
+                    <!-- Close button in upper right -->
+                    <button 
+                        onclick="initiateDismiss('${item.id}')"
+                        class="absolute top-4 right-4 z-10 text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10 p-1.5 rounded-full transition-all focus:outline-none select-none"
+                        title="${translations[currentLang].dismissTooltip}"
+                    >
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+
+                    <!-- Gesture Swipe indicator hint (glow arrow on mobile) -->
+                    <div class="absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-1 opacity-20 pointer-events-none select-none">
+                        <span class="text-[9px] uppercase tracking-widest font-extrabold text-zinc-400">${translations[currentLang].swipeDismiss}</span>
+                        <svg class="w-3 h-3 text-zinc-400 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>
+                    </div>
+
+                    <!-- Inner Grid Layout -->
+                    <div class="grid grid-cols-1 md:grid-cols-12 gap-5 items-start">
+                        
+                        <!-- Left Side: User & Chat list -->
+                        <div class="md:col-span-7 flex flex-col gap-4">
+                            <div class="flex items-center gap-3">
+                                <div class="w-14 h-14 rounded-full border border-purple-500/30 p-0.5 bg-dark-950">
+                                    ${getAvatarHTML(item.nickname, item.profilePic)}
+                                </div>
+                                <div>
+                                    <h3 class="text-base sm:text-lg font-bold font-display text-white leading-snug truncate max-w-[200px] sm:max-w-[260px]">${item.nickname}</h3>
+                                    <p class="text-xs text-purple-400 font-semibold tracking-wide">@${item.username}</p>
+                                </div>
+                            </div>
+                            
+                            <!-- Messages logs -->
+                            <div class="flex flex-col gap-2">
+                                <span class="text-[10px] font-extrabold uppercase text-zinc-500 tracking-wider">${translations[currentLang].chatLogs}</span>
+                                <div id="chat-${item.id}" class="chat-container flex flex-col gap-2 overflow-y-auto max-h-[140px] pr-1.5 py-1 bg-dark-950/50 border border-dark-800 rounded-xl p-3">
+                                    ${messageListHTML}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right Side: Gift Badge display -->
+                        <div class="md:col-span-5 flex flex-col items-center md:items-end justify-center md:h-full gap-4 md:border-l md:border-dark-800/80 md:pl-5 pt-3 md:pt-0">
+                            
+                            <!-- Dynamic Badge display -->
+                            <div class="flex items-center gap-2.5 bg-purple-500/10 border border-purple-500/20 px-4 py-2 rounded-xl w-full max-w-[220px] justify-center shadow-sm">
+                                ${getGiftIconHTML(item.giftName, item.giftIcon)}
+                                <div class="truncate select-none pointer-events-none">
+                                    <div class="text-[9px] uppercase tracking-wider font-extrabold text-purple-400 leading-none">${translations[currentLang].giftSent}</div>
+                                    <div class="text-xs font-bold text-zinc-200 mt-1 truncate" title="${item.giftName}">${item.giftName}</div>
+                                </div>
+                            </div>
+
+                            <!-- Big Counter Badge -->
+                            <div class="flex items-baseline gap-1 select-none pointer-events-none">
+                                <span class="text-xl sm:text-2xl font-black text-pink-500 font-display">x</span>
+                                <span class="text-4xl sm:text-5xl font-black bg-gradient-to-br from-pink-400 via-rose-500 to-amber-400 bg-clip-text text-transparent font-display leading-none tracking-tight">
+                                    ${item.giftCount}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Auto-scroll chat container to the bottom
+            const container = document.getElementById(`chat-${item.id}`);
+            if (container) {
+                container.scrollTop = container.scrollHeight;
+            }
+
+            // Setup pointer gesture listeners for horizontal swipe dismissal
+            const cardEl = document.getElementById(`topCard-${item.id}`);
+            if (cardEl) {
+                bindSwipeGestures(cardEl, item.id);
+            }
+        }
+
+        function createCollapsedRow(item) {
+            return `
+                <div class="bg-dark-900/30 border border-dark-800/80 hover:border-dark-700/80 p-3.5 rounded-xl flex items-center justify-between transition-all select-none duration-250">
+                    <div class="flex items-center gap-3">
+                        <div class="w-9 h-9 rounded-full border border-dark-800 bg-dark-950 p-0.5">
+                            ${getAvatarHTML(item.nickname, item.profilePic)}
+                        </div>
+                        <div class="truncate max-w-[120px] sm:max-w-[200px]">
+                            <h4 class="text-xs sm:text-sm font-semibold text-zinc-200 truncate leading-snug">${item.nickname}</h4>
+                            <p class="text-[10px] text-zinc-500 leading-none mt-0.5">@${item.username}</p>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center gap-4">
+                        <div class="flex items-center gap-2 bg-dark-800/60 border border-dark-700/40 px-2.5 py-1 rounded-lg">
+                            ${getGiftIconHTML(item.giftName, item.giftIcon)}
+                            <span class="text-xs font-semibold text-zinc-400 truncate max-w-[80px]" title="${item.giftName}">${item.giftName}</span>
+                        </div>
+                        <div class="flex items-baseline gap-0.5 w-12 justify-end">
+                            <span class="text-xs font-bold text-pink-500 font-display">x</span>
+                            <span class="text-base font-extrabold text-zinc-100 font-display leading-none">${item.giftCount}</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function escapeHTML(str) {
+            return str
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        // ----------------------------------------------------
+        // SWIPE DISMISS GESTURES
+        // ----------------------------------------------------
+        function bindSwipeGestures(el, containerId) {
+            let startX = 0;
+            let currentX = 0;
+            let isDragging = false;
+            const swipeThreshold = 80; // horizontal swipe threshold in pixels
+            
+            // Mouse / Touch multi-pointer API support
+            el.addEventListener('pointerdown', (e) => {
+                // If clicking a button (like the close button), let it handle the click normally!
+                if (e.target.closest('button')) return;
+
+                // Ignore auxiliary button clicks (middle/right)
+                if (e.button !== 0) return;
+                
+                startX = e.clientX;
+                isDragging = true;
+                el.style.transition = 'none';
+                el.setPointerCapture(e.pointerId);
+            });
+
+            el.addEventListener('pointermove', (e) => {
+                if (!isDragging) return;
+                currentX = e.clientX - startX;
+                
+                // Only allow swiping to the left (negative translation)
+                if (currentX < 0) {
+                    el.style.transform = `translateX(${currentX}px)`;
+                    // Interpolate opacity down to 0.3 as it drags left
+                    const opacity = Math.max(0.3, 1 + (currentX / 250));
+                    el.style.opacity = opacity;
+                }
+            });
+
+            el.addEventListener('pointerup', (e) => {
+                if (!isDragging) return;
+                isDragging = false;
+                
+                el.style.transition = 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease';
+                
+                // If dragged past negative threshold, dismiss
+                if (currentX < -swipeThreshold) {
+                    initiateDismiss(containerId);
+                } else {
+                    // Snap back
+                    el.style.transform = 'translateX(0)';
+                    el.style.opacity = '1';
+                }
+                el.releasePointerCapture(e.pointerId);
+            });
+
+            el.addEventListener('pointercancel', (e) => {
+                if (!isDragging) return;
+                isDragging = false;
+                el.style.transition = 'transform 0.2s ease, opacity 0.2s ease';
+                el.style.transform = 'translateX(0)';
+                el.style.opacity = '1';
+                el.releasePointerCapture(e.pointerId);
+            });
+        }
+
+        // Animate and trigger dismissal logic
+        function initiateDismiss(id) {
+            const card = document.getElementById(`topCard-${id}`);
+            if (card) {
+                // Apply animation classes
+                card.style.transition = 'transform 0.3s ease-out, opacity 0.3s ease-out';
+                card.style.transform = 'translateX(-110%)';
+                card.style.opacity = '0';
+                
+                setTimeout(() => {
+                    dismissContainer(id);
+                }, 300);
+            } else {
+                dismissContainer(id);
+            }
+        }
+
+        function dismissContainer(id) {
+            // Send socket event to backend
+            socket.emit('dismiss_container', id);
+
+            // Filter item out locally and re-render
+            queue = queue.filter(item => item.id !== id);
+            renderQueue();
+        }
+
+        // ----------------------------------------------------
+        // SOCKET LISTENERS
+        // ----------------------------------------------------
+        
+        // Initial Full Synchronization
+        socket.on('sync_queue', (backendQueue) => {
+            queue = backendQueue;
+            renderQueue();
+        });
+
+        // Live event: New Gift Added
+        socket.on('new_gift', (newGift) => {
+            // Append if not exists
+            if (!queue.find(item => item.id === newGift.id)) {
+                queue.push(newGift);
+                renderQueue();
+            }
+        });
+
+        // Live event: Update Gift Count / Info
+        socket.on('update_gift', (data) => {
+            const item = queue.find(x => x.id === data.id);
+            if (item) {
+                item.giftCount = data.giftCount;
+                item.giftName = data.giftName;
+                item.giftIcon = data.giftIcon;
+                renderQueue();
+            }
+        });
+
+        // Live event: Incoming messages
+        socket.on('incoming_message', (data) => {
+            const item = queue.find(x => x.id === data.id);
+            if (item) {
+                item.messages.push(data.message);
+                
+                // If it is currently the expanded top container, update details and scroll comments
+                const topItem = queue.filter(x => !x.done)[0];
+                if (topItem && topItem.id === data.id) {
+                    const chatLog = document.getElementById(`chat-${data.id}`);
+                    if (chatLog) {
+                        const newMsgDiv = document.createElement('div');
+                        newMsgDiv.className = 'text-[12px] leading-relaxed px-2 py-1 rounded bg-dark-950/45 border-l-2 border-purple-500/40';
+                        newMsgDiv.innerHTML = `
+                            <span class="font-bold text-purple-300 font-display">${item.nickname}</span>
+                            <span class="text-zinc-300 ml-1">${escapeHTML(data.message)}</span>
+                        `;
+                        chatLog.appendChild(newMsgDiv);
+                        // Auto scroll
+                        chatLog.scrollTop = chatLog.scrollHeight;
+                    } else {
+                        renderQueue();
+                    }
+                }
+            }
+        });
+
+        // Live event: Synchronized Dismissal (if dismissed on another window)
+        socket.on('container_dismissed', (id) => {
+            queue = queue.filter(item => item.id !== id);
+            renderQueue();
+        });
+
+        // Live event: Queue cleared
+        socket.on('queue_cleared', () => {
+            queue = [];
+            renderQueue();
+        });
+
+        // Live connection status shifts
+        socket.on('status_change', (data) => {
+            connectionStatus = data.status;
+            
+            // Reset styles
+            statusIndicator.className = 'w-2.5 h-2.5 rounded-full transition-colors duration-300';
+            pulsingLiveDot.classList.add('hidden');
+            
+            // Handle session lock from another user
+            if (data.isLocked) {
+                usernameInput.disabled = true;
+                usernameInput.classList.add('opacity-50', 'cursor-not-allowed');
+                
+                connectBtn.disabled = true;
+                connectBtn.textContent = currentLang === 'es' ? 'Sesión Activa' : 'Locked';
+                connectBtn.className = 'bg-dark-700 text-zinc-500 font-bold px-5 py-2 rounded-lg text-sm transition-all border border-dark-600/40 cursor-not-allowed shrink-0';
+                
+                clearQueueBtn.disabled = true;
+                clearQueueBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                
+                if (data.status === 'connected') {
+                    statusIndicator.classList.add('bg-accent-emerald');
+                    statusText.textContent = `${translations[currentLang].statusConnected} (${data.username})`;
+                    pulsingLiveDot.classList.remove('hidden');
+                } else if (data.status === 'connecting') {
+                    statusIndicator.classList.add('bg-accent-amber');
+                    statusText.textContent = `${translations[currentLang].statusConnecting} (${data.username})...`;
+                } else {
+                    statusIndicator.classList.add('bg-zinc-500');
+                    statusText.textContent = translations[currentLang].statusOffline;
+                }
+                return;
+            }
+            
+            // If not locked, manage standard control states
+            clearQueueBtn.disabled = false;
+            clearQueueBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            
+            if (data.status === 'connected') {
+                statusIndicator.classList.add('bg-accent-emerald');
+                statusText.textContent = `${translations[currentLang].statusConnected} (${data.username})`;
+                pulsingLiveDot.classList.remove('hidden');
+                
+                // Toggle Button styling to Red
+                connectBtn.textContent = translations[currentLang].btnStop;
+                connectBtn.disabled = false;
+                connectBtn.className = 'bg-accent-rose hover:bg-rose-600 active:scale-95 text-white font-bold px-5 py-2 rounded-lg text-sm transition-all shadow-md shadow-rose-950/20 shrink-0';
+                usernameInput.disabled = true;
+                usernameInput.classList.add('opacity-50', 'cursor-not-allowed');
+            } else if (data.status === 'connecting') {
+                statusIndicator.classList.add('bg-accent-amber');
+                statusText.textContent = `${translations[currentLang].statusConnecting} (${data.username})...`;
+                
+                connectBtn.textContent = translations[currentLang].btnConnecting;
+                connectBtn.disabled = true;
+                connectBtn.className = 'bg-dark-700 text-zinc-400 font-bold px-5 py-2 rounded-lg text-sm transition-all border border-dark-600/40 cursor-wait shrink-0';
+                usernameInput.disabled = true;
+                usernameInput.classList.add('opacity-50', 'cursor-not-allowed');
+            } else if (data.status === 'error') {
+                statusIndicator.classList.add('bg-accent-rose');
+                statusText.textContent = `${translations[currentLang].statusError} (${data.error})`;
+                
+                // Reset Button
+                connectBtn.textContent = translations[currentLang].btnStart;
+                connectBtn.disabled = false;
+                connectBtn.className = 'bg-accent-emerald hover:bg-emerald-600 active:scale-95 text-white font-bold px-5 py-2 rounded-lg text-sm transition-all shadow-md shadow-emerald-950/20 shrink-0';
+                usernameInput.disabled = false;
+                usernameInput.classList.remove('opacity-50', 'cursor-not-allowed');
+            } else {
+                // Offline
+                statusIndicator.classList.add('bg-zinc-500');
+                statusText.textContent = translations[currentLang].statusOffline;
+                
+                // Reset Button
+                connectBtn.textContent = translations[currentLang].btnStart;
+                connectBtn.disabled = false;
+                connectBtn.className = 'bg-accent-emerald hover:bg-emerald-600 active:scale-95 text-white font-bold px-5 py-2 rounded-lg text-sm transition-all shadow-md shadow-emerald-950/20 shrink-0';
+                usernameInput.disabled = false;
+                usernameInput.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+        });
+
+        // ----------------------------------------------------
+        // USER INTERACTIONS
+        // ----------------------------------------------------
+        connectBtn.addEventListener('click', () => {
+            if (connectionStatus === 'connected' || connectionStatus === 'connecting') {
+                // Trigger stop connection
+                socket.emit('stop_stream');
+            } else {
+                // Trigger start connection
+                const username = usernameInput.value.trim();
+                if (!username) {
+                    alert(translations[currentLang].alertEmptyUsername);
+                    return;
+                }
+                // Send username and selected language
+                socket.emit('start_stream', { username, language: currentLang });
+            }
+        });
+
+        // Allow pressing Enter in input field
+        usernameInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !usernameInput.disabled) {
+                connectBtn.click();
+            }
+        });
+
+        // Clear active queue items
+        clearQueueBtn.addEventListener('click', () => {
+            if (confirm(translations[currentLang].confirmClearQueue)) {
+                socket.emit('clear_queue');
+            }
+        });
+    </script>
+</body>
+</html>
