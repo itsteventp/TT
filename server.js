@@ -86,6 +86,7 @@ let mockIntervals = [];
 let ownerSocketId = null;
 let connectionState = 'offline'; // 'offline', 'connecting', 'connected', 'error'
 let connectionError = null;
+const userLatestMessages = new Map();
 
 // Broadcast status to all sockets, checking owner lock individually
 function broadcastStatus() {
@@ -139,6 +140,7 @@ function disconnectTikTok() {
     mockIntervals.forEach(clearInterval);
     mockIntervals = [];
     isMockConnection = false;
+    userLatestMessages.clear();
 
     if (tiktokConnection) {
         try {
@@ -266,6 +268,13 @@ function handleGiftEvent(data) {
         });
         console.log(`Updated Gift for ${uniqueId}: Count=${existing.giftCount}, Gifts=${existing.giftName}`);
     } else {
+        // Retrieve cached message if there's one
+        const initialMessages = [];
+        if (userLatestMessages.has(uniqueId)) {
+            initialMessages.push(userLatestMessages.get(uniqueId));
+            userLatestMessages.delete(uniqueId);
+        }
+
         // Push a new object to the queue
         const newGift = {
             id: generateId(),
@@ -275,7 +284,7 @@ function handleGiftEvent(data) {
             giftName: giftName,
             giftIcon: giftIcon,
             giftCount: repeatCount,
-            messages: [],
+            messages: initialMessages,
             done: false,
             _lastGiftName: giftName,
             _lastRepeatCount: repeatCount
@@ -292,6 +301,9 @@ function handleChatEvent(data) {
     const comment = data.content || data.comment;
 
     if (!uniqueId || !comment) return;
+
+    // Cache the latest message for this user
+    userLatestMessages.set(uniqueId, comment);
 
     // Check if user has an active, unfinished container in the queue
     let existing = giftQueue.find(item => item.username === uniqueId && !item.done);
@@ -431,6 +443,7 @@ io.on('connection', (socket) => {
     socket.on('clear_queue', () => {
         if (ownerSocketId !== null && ownerSocketId !== socket.id) return;
         giftQueue = [];
+        userLatestMessages.clear();
         console.log('Cleared all active queue items.');
         io.emit('queue_cleared');
     });
